@@ -3,36 +3,64 @@ import os
 import cv2
 from matplotlib import pyplot as plt
 
-def bb_intersection_over_union(boxA, boxB):
+
+def get_iou(box_a, box_b):
     # rf https://www.pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/
     # determine the (x, y)-coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
+    x_a = max(box_a[0], box_b[0])
+    y_a = max(box_a[1], box_b[1])
+    x_b = min(box_a[2], box_b[2])
+    y_b = min(box_a[3], box_b[3])
 
     # compute the area of intersection rectangle
-    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+    inter_area = max(0, x_b - x_a + 1) * max(0, y_b - y_a + 1)
 
     # compute the area of both the prediction and ground-truth
     # rectangles
-    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
-    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+    box_a_area = (box_a[2] - box_a[0] + 1) * (box_a[3] - box_a[1] + 1)
+    box_b_area = (box_b[2] - box_b[0] + 1) * (box_b[3] - box_b[1] + 1)
 
     # compute the intersection over union by taking the intersection
     # area and dividing it by the sum of prediction + ground-truth
     # areas - the interesection area
-    iou = interArea / float(boxAArea + boxBArea - interArea)
+    iou_value = inter_area / float(box_a_area + box_b_area - inter_area)
 
     # return the intersection over union value
-    return iou
+    return iou_value
+
+
+def getId(output):
+    max = 0
+    id_max = -1
+    for previous_output in cameraDetector.detections:
+        if output.get('name') == previous_output.get('type'):
+            iou = get_iou(output.get('box_points'), previous_output.get('box_points'))
+            # print("UOI between {} and {} is {}".format(output.get('box_points'), previous_output.get('box_points'), iou))
+            if max < iou:
+                max = iou
+                id_max = previous_output.get('id')
+    # print("UOI max is {} ".format(max))
+    if max > 0.3:
+        return id_max
+    else:
+        return -1
+
 
 def forFrame(frame_number, output_array, output_count, returned_frame):
     for output in output_array:
-        data = {'id': len(cameraDetector.detections), 'type': output.get('name'), 'box_points': output.get('box_points')}
-        print(data)
+        id = getId(output)
+        data = {}
+        if id == -1:
+            data = {'id': len(cameraDetector.detections), 'type': output.get('name'),
+                    'box_points': output.get('box_points')}
+            cameraDetector.detections.append(data)
+        else:
+            data = {'id': id, 'type': output.get('name'),
+                    'box_points': output.get('box_points')}
+            cameraDetector.detections[id] = data
         cameraDetector.detections.append(data)
-        cv2.putText(returned_frame, str(data.get('id')), (data.get('box_points')[0], data.get('box_points')[1] + 25), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (72, 114, 255), thickness=4)
+        cv2.putText(returned_frame, str(data.get('id')), (data.get('box_points')[0], data.get('box_points')[1] + 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (72, 114, 255), thickness=4)
     cv2.imshow("Detection", returned_frame)
     cv2.waitKey(1)
 
